@@ -63,11 +63,15 @@ python -m http.server -d docs 8000
 
 ### 方式一：GitHub Actions（推荐）
 
-1. 打开仓库的 **Settings → Pages**。
-2. **Source** 选 **GitHub Actions**。
-3. 把改动推到 `main` 分支。
+1. 打开仓库的 **[Settings → Pages](https://github.com/FuzzyLogic112/Auto-Data-Pipeline/settings/pages)**。
+2. **Source** 选 **GitHub Actions**。这一步只需做一次。
+3. 把改动推到 `main` 分支，或在 **Actions** 页面手动点 **Run workflow**。
 
-`.github/workflows/pages.yml` 会重新从 Markdown 构建并部署。也可以在 **Actions** 页面手动点 **Run workflow**。
+`.github/workflows/pages.yml` 会重新从 Markdown 构建并部署。
+
+> 第 2 步没法用工作流代劳：`actions/configure-pages` 的 `enablement: true` 需要
+> `GITHUB_TOKEN` 去调建站点的 API，而该调用会被拒绝（`Resource not accessible by
+> integration`）。所以首次启用必须手点一次。
 
 ### 方式二：从分支部署（不用 Actions）
 
