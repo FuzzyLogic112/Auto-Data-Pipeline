@@ -1,0 +1,71 @@
+name: 部署《Claude 红皮书》到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Claude红皮书.md"
+      - "tools/build_site.py"
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch: # 允许在 Actions 页面手动点击运行
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同时只跑一个部署，但不取消进行中的那个（半途取消会让站点处于中间状态）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建站点
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 准备 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        run: pip install markdown
+
+      - name: 从 Markdown 重新生成站点
+        run: python tools/build_site.py
+
+      - name: 检查仓库里的 docs/ 是否与正文同步
+        # 部署的永远是这一步之前刚生成的版本，所以这里不让流水线失败，
+        # 只提醒你本地补一次构建——否则 Pages 的"从分支部署"模式会看到旧页面。
+        run: |
+          if git diff --quiet -- docs/; then
+            echo "docs/ 与 Claude红皮书.md 同步。"
+          else
+            echo "::warning::docs/ 与 Claude红皮书.md 不同步。请在本地运行 python tools/build_site.py 并提交结果。"
+            git diff --stat -- docs/
+          fi
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    name: 部署
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 发布到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
