@@ -50,12 +50,11 @@ jobs:
             git diff --stat -- docs/
           fi
 
+      # 需要先在 Settings → Pages 把 Source 设为 "GitHub Actions"（只需做一次）。
+      # 试过用 configure-pages 的 enablement: true 自动开启，但 GITHUB_TOKEN 建站点会被
+      # 拒绝（Resource not accessible by integration），所以这一步仍然依赖那次手动设置。
       - name: 配置 Pages
         uses: actions/configure-pages@v5
-        with:
-          # 仓库还没开启 Pages 时，由这一步用 pages:write 权限自动开启，
-          # 省掉手动去 Settings → Pages 点一次的步骤。
-          enablement: true
 
       - name: 上传站点产物
         uses: actions/upload-pages-artifact@v3
