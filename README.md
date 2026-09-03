@@ -1,95 +1,70 @@
-# Claude 红皮书
+# Auto-Data-Pipeline
 
-> 一本写给开发者、独立开发者和 AI 工具重度用户的 Claude、Claude Code 与 Claude API 非官方开源中文指南。
+一条跑在 GitHub Actions 上的每日自动数据管道：定时抓取东京实时天气，追加到 CSV，再把结果提交回仓库。不需要服务器，不需要数据库，全靠 GitHub 免费的定时任务跑。
 
-**[📖 在线阅读](https://fuzzylogic112.github.io/Auto-Data-Pipeline/)** · [Markdown 原稿](./Claude红皮书.md)
+## 它做什么
 
-## 这是什么
+每天北京时间 06:34（UTC 22:34），GitHub Actions 会：
 
-《Claude 红皮书》围绕 Claude Code 的真实使用场景整理，目标是帮你把 AI 编码代理真正放进日常工作和软件项目里，而不是停留在"问一句答一句"。
+1. 拉取仓库代码，装好 Python 环境和依赖
+2. 执行 `crawler.py`，从 [Open-Meteo](https://open-meteo.com/) 免费接口抓一次东京当前天气
+3. 把时间、温度、风速追加写入 `weather_data.csv`
+4. 以机器人身份把新数据提交回 `main` 分支
 
-它不是 Anthropic 官方文档，也不代表官方产品承诺。内容基于公开文档、实际界面和实战经验整理，适合作为上手路线、工作流参考和案例材料阅读。
-
-## 内容包括
-
-- **基础认知**：Claude 应用 / Claude Code / Claude API 三个入口的区别，模型家族与选型，和 Cursor、Copilot 的差异。
-- **安装与配置**：各平台安装方式、认证、权限模式、命令速查、配置文件都在哪。
-- **核心能力**：CLAUDE.md 项目记忆、`.claude/rules/` 路径规则、自动记忆、Skills、Subagents、Hooks、MCP、Plugins、Git 与 GitHub 工作流、GitHub Actions、上下文管理。
-- **标准工作流**：探索 → 计划 → 实现 → 验证 → 交付的完整链路，提示词模板库，反模式清单。
-- **实战案例**：读懂陌生仓库、给脚本加健壮性、搭每日数据管道、把 Markdown 变成网站、写自己的 Skill。
-- **附录**：Claude API 快速上手、配置速查表、常见问题。
+于是 `weather_data.csv` 会自己一天天长起来，形成一份连续的时间序列。
 
 ## 仓库结构
 
 ```text
 .
-├── Claude红皮书.md              # 完整正文，唯一的内容来源
-├── tools/
-│   └── build_site.py            # 构建脚本：Markdown → docs/index.html
-├── docs/                        # GitHub Pages 站点（构建产物 + 手写样式）
-│   ├── index.html               # 由 build_site.py 生成，不要手改
-│   ├── assets/site.css          # 手写样式，可直接改
-│   ├── assets/site.js           # 目录高亮、阅读进度、窄屏折叠目录
-│   ├── favicon.svg
-│   └── .nojekyll                # 让 Pages 跳过 Jekyll 处理
+├── crawler.py                      # 抓取脚本：请求接口、解析字段、追加写 CSV
+├── weather_data.csv                # 抓取结果，由 Actions 自动追加
 ├── .github/workflows/
-│   ├── pages.yml                # 构建并部署到 GitHub Pages
-│   └── daily_task.yml           # 每日天气数据抓取（见下）
-├── crawler.py                   # 天气数据抓取脚本
-└── weather_data.csv             # 抓取结果
+│   ├── daily_task.yml              # 每日定时抓取并提交
+│   └── pages.yml                   # 发布 docs/ 下的迁移跳转页
+└── docs/index.html                 # 《Claude 红皮书》迁移跳转页（见下）
 ```
 
-> 这个仓库同时还是一条每日自动数据管道的示例（`crawler.py` + `daily_task.yml`），书里的[实战案例二和案例三](https://fuzzylogic112.github.io/Auto-Data-Pipeline/#案例二给一个脚本加上生产级的健壮性)就以它为素材。两部分互不影响。
-
-## 本地构建
+## 本地运行
 
 ```bash
-pip install markdown
-python tools/build_site.py
+pip install requests pandas
+python crawler.py
 ```
 
-产物写到 `docs/index.html`。直接用浏览器打开就能预览，或起一个本地服务器：
+会在当前目录生成或追加 `weather_data.csv`。
 
-```bash
-python -m http.server -d docs 8000
-# 打开 http://localhost:8000
+## 换一个城市 / 换一套数据
+
+`crawler.py` 里的接口地址决定了抓什么：
+
+```python
+url = "https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current_weather=true&timezone=Asia/Tokyo"
 ```
 
-**改内容**只动 `Claude红皮书.md`，然后重新构建；**改样式**只动 `docs/assets/site.css`，构建脚本不会覆盖它。
+- 换城市：改 `latitude` / `longitude`，并把 `timezone` 改成对应时区（例如北京是 `Asia/Shanghai`）
+- 换字段：Open-Meteo 支持 `hourly`、`daily` 等参数，改完接口后同步改脚本里提取字段和写 CSV 的部分
 
-## 部署到 GitHub Pages
+## 改抓取时间
 
-两种方式任选其一，仓库对两种都做好了准备。
+编辑 `.github/workflows/daily_task.yml` 里的 cron 表达式：
 
-### 方式一：GitHub Actions（推荐）
+```yaml
+on:
+  schedule:
+    - cron: '34 22 * * *'   # UTC 时间，对应北京时间次日 06:34
+```
 
-1. 打开仓库的 **[Settings → Pages](https://github.com/FuzzyLogic112/Auto-Data-Pipeline/settings/pages)**。
-2. **Source** 选 **GitHub Actions**。这一步只需做一次。
-3. 把改动推到 `main` 分支，或在 **Actions** 页面手动点 **Run workflow**。
+⚠️ GitHub Actions 的 cron 走 **UTC**，写之前先做时区换算。另外定时任务在高峰期会被延迟甚至跳过，不要依赖它做精确到分钟的事；公开仓库连续 60 天没有活动，定时任务会被自动停用。
 
-`.github/workflows/pages.yml` 会重新从 Markdown 构建并部署。
+## 关于 docs/ 目录
 
-> 第 2 步没法用工作流代劳：`actions/configure-pages` 的 `enablement: true` 需要
-> `GITHUB_TOKEN` 去调建站点的 API，而该调用会被拒绝（`Resource not accessible by
-> integration`）。所以首次启用必须手点一次。
+这个仓库曾经托管过《Claude 红皮书》，后来迁到了独立仓库。`docs/index.html` 现在只是一个跳转页，让已经传播出去的旧链接不至于直接 404。
 
-### 方式二：从分支部署（不用 Actions）
+- 新仓库：**https://github.com/FuzzyLogic112/claude-red-book**
+- 在线阅读：**https://fuzzylogic112.github.io/claude-red-book/**
 
-1. 先在本地跑一次 `python tools/build_site.py`，把 `docs/` 的改动提交上去。
-2. **Settings → Pages** → **Source** 选 **Deploy from a branch**。
-3. 分支选 `main`，目录选 **`/docs`**，保存。
-
-这种方式部署的是仓库里已提交的 `docs/index.html`，所以每次改完正文都**必须记得重新构建并提交**。Actions 工作流在检测到不同步时会给出警告。
-
-部署完成后访问：**https://fuzzylogic112.github.io/Auto-Data-Pipeline/**
-
-> 首次启用 Pages 后可能要等一两分钟才能访问到。
-
-## 说明
-
-Claude 更新很快，安装方式、模型名称、额度、入口位置和命令参数都可能变化。涉及具体功能、价格和账号能力时，请以 [Claude Code 官方文档](https://code.claude.com/docs)、[Claude 平台文档](https://platform.claude.com) 和你账号实际显示为准。
-
-发现过时或错误的内容，欢迎提 issue 或 PR。
+书里的实战案例二、案例三仍然以本仓库的 `crawler.py` 和 `daily_task.yml` 为素材。
 
 ## License
 
