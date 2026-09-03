@@ -52,6 +52,10 @@ jobs:
 
       - name: 配置 Pages
         uses: actions/configure-pages@v5
+        with:
+          # 仓库还没开启 Pages 时，由这一步用 pages:write 权限自动开启，
+          # 省掉手动去 Settings → Pages 点一次的步骤。
+          enablement: true
 
       - name: 上传站点产物
         uses: actions/upload-pages-artifact@v3
